@@ -101,3 +101,6 @@ server/uploads/
 
 # OS files
 Thumbs.db 
+
+# Recordings / Large Media
+Recordings/ 
