@@ -1,0 +1,595 @@
+const express = require('express');
+const path = require('path');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const dotenv = require('dotenv');
+const cors = require('cors');
+const multer = require('multer');
+const fs = require('fs');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const session = require('express-session');
+const asyncHandler = require('express-async-handler');
+const OpenAI = require('openai');
+const Anthropic = require('@anthropic-ai/sdk');
+
+// Load environment variables
+dotenv.config();
+
+// Initialize Express app
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'research_gap_identifier_secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Configure Google Strategy
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID || 'your-client-id',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'your-client-secret',
+    callbackURL: '/auth/google/callback'
+}, (accessToken, refreshToken, profile, done) => {
+    // In a production app, you would typically save the user to a database
+    return done(null, profile);
+}));
+
+// Serialize and deserialize user
+passport.serializeUser((user, done) => {
+    done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+    done(null, user);
+});
+
+// Auth routes
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+app.get('/auth/google/callback', 
+    passport.authenticate('google', { failureRedirect: '/login' }),
+    (req, res) => {
+        res.redirect('/');
+    }
+);
+
+app.get('/api/user', (req, res) => {
+    if (req.isAuthenticated()) {
+        return res.json({
+            isAuthenticated: true,
+            user: {
+                id: req.user.id,
+                name: req.user.displayName,
+                email: req.user.emails?.[0]?.value,
+                picture: req.user.photos?.[0]?.value
+            }
+        });
+    }
+    return res.json({ isAuthenticated: false });
+});
+
+app.get('/auth/logout', (req, res) => {
+    req.logout(function(err) {
+        if (err) { return next(err); }
+        res.redirect('/login');
+    });
+});
+
+// Login page route
+app.get('/login', (req, res) => {
+    if (req.isAuthenticated()) {
+        return res.redirect('/');
+    }
+    res.sendFile(path.join(__dirname, '../public/login/index.html'));
+});
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+
+const upload = multer({ storage });
+
+// Initialize Google Generative AI with API key
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Store user chat history
+const userChats = new Map();
+
+// Rate limiting setup - 5 requests per minute for free tier
+const userRequests = new Map();
+
+function isRateLimited(req) {
+    if (!req.isAuthenticated()) {
+        return false; // Non-authenticated users can't access the API anyway
+    }
+
+    const userId = req.user.id;
+    const now = Date.now();
+    const windowMs = 60 * 1000; // 1 minute window
+    const maxRequests = 5; // 5 requests per minute for free tier
+    
+    if (!userRequests.has(userId)) {
+        userRequests.set(userId, []);
+    }
+    
+    const userRequestTimes = userRequests.get(userId);
+    
+    // Filter out requests that are older than the window
+    const recentRequests = userRequestTimes.filter(time => now - time < windowMs);
+    userRequests.set(userId, recentRequests);
+    
+    if (recentRequests.length >= maxRequests) {
+        return true; // User is rate limited
+    }
+    
+    // Add current request time
+    recentRequests.push(now);
+    userRequests.set(userId, recentRequests);
+    
+    return false; // User is not rate limited
+}
+
+// Function to create a prompt for research gap analysis
+function createAnalysisPrompt(papers) {
+    let prompt = `You are a research analyst specializing in identifying research gaps. 
+    I'm providing the content of ${papers.length} research papers. 
+    Please analyze these papers thoroughly and identify potential research gaps or areas for further investigation. 
+    
+    Your analysis should:
+    1. Identify key themes and findings across all papers
+    2. Detect areas where research is limited or contradictory
+    3. Identify methodological gaps
+    4. Note potential research questions that remain unanswered
+    
+    For each paper, here is the content:
+    
+    `;
+    
+    papers.forEach((paper, index) => {
+        prompt += `PAPER ${index + 1}: ${paper.fileName}\n\n`;
+        
+        // Add a truncated version of the paper if it's too long
+        const maxLength = 15000; // Limiting each paper to avoid exceeding context limits
+        let paperText = paper.text;
+        if (paperText.length > maxLength) {
+            paperText = paperText.substring(0, maxLength) + "... [content truncated due to length]";
+        }
+        
+        prompt += `${paperText}\n\n`;
+    });
+    
+    prompt += `
+    Please respond with a JSON object that includes:
+    1. A "summary" field with a brief overview of the papers and their relationships
+    2. A "gaps" array, with each gap containing:
+       - "title": A short title for the identified gap
+       - "description": A detailed explanation of the gap
+       - "relatedPapers": An array of the paper filenames related to this gap
+    3. A "recommendations" array with suggestions for future research
+    
+    FORMAT YOUR RESPONSE AS VALID JSON.`;
+    
+    return prompt;
+}
+
+/**
+ * Generates an AI response using the specified model
+ * @param {string} message - User's message
+ * @param {Array} chatHistory - Array of previous chat messages
+ * @param {string} model - The AI model to use: gemini-1.5-pro, gpt-4o, claude-3-opus, or gemini-pro
+ * @param {string} sessionId - The session ID
+ * @returns {Promise<Object>} - Object containing the AI response
+ */
+async function generateAIResponse(message, chatHistory, model, sessionId) {
+    console.log(`Generating response using ${model}`);
+    
+    // Check if the model is a Gemini model
+    if (model.includes('gemini')) {
+        return await generateGeminiResponse(message, chatHistory, model);
+    } 
+    // Handle OpenAI models (e.g., gpt-4o)
+    else if (model.includes('gpt')) {
+        return await generateOpenAIResponse(message, chatHistory, model);
+    } 
+    // Handle Claude models (e.g., claude-3-opus)
+    else if (model.includes('claude')) {
+        return await generateClaudeResponse(message, chatHistory, model);
+    }
+    else {
+        throw new Error(`Unsupported model: ${model}`);
+    }
+}
+
+/**
+ * Generates a response using Google's Gemini models
+ * @param {string} message - User's message
+ * @param {Array} chatHistory - Array of previous chat messages
+ * @param {string} modelName - The specific Gemini model to use
+ * @returns {Promise<Object>} - Object containing the AI response
+ */
+async function generateGeminiResponse(message, chatHistory, modelName) {
+    try {
+        // Get the model
+        const model = genAI.getGenerativeModel({ model: modelName });
+        
+        // Format chat history for Gemini
+        const formattedHistory = chatHistory.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+        }));
+        
+        // Start a chat session
+        const chat = model.startChat({
+            history: formattedHistory,
+            generationConfig: {
+                maxOutputTokens: 2048,
+                temperature: 0.7,
+                topP: 0.95,
+                topK: 40,
+            },
+        });
+        
+        // Send the message and get a response
+        const result = await chat.sendMessage(message);
+        const response = await result.response;
+        const text = response.text();
+        
+        return {
+            response: text,
+            model: modelName
+        };
+    } catch (error) {
+        console.error(`Error generating Gemini response with ${modelName}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Generates a response using OpenAI models
+ * @param {string} message - User's message
+ * @param {Array} chatHistory - Array of previous chat messages
+ * @param {string} modelName - The specific OpenAI model to use
+ * @returns {Promise<Object>} - Object containing the AI response
+ */
+async function generateOpenAIResponse(message, chatHistory, modelName) {
+    try {
+        if (!process.env.OPENAI_API_KEY) {
+            throw new Error('OpenAI API key is not configured. Please add OPENAI_API_KEY to your environment variables.');
+        }
+        
+        // Initialize OpenAI client
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+        
+        // Format chat history for OpenAI
+        const formattedMessages = chatHistory.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.content
+        }));
+        
+        // Add the user's current message
+        formattedMessages.push({
+            role: 'user',
+            content: message
+        });
+        
+        // Call OpenAI API
+        const completion = await openai.chat.completions.create({
+            model: modelName,
+            messages: formattedMessages,
+            max_tokens: 2048,
+            temperature: 0.7,
+        });
+        
+        return {
+            response: completion.choices[0].message.content,
+            model: modelName
+        };
+    } catch (error) {
+        console.error(`Error generating OpenAI response with ${modelName}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Generates a response using Anthropic Claude models
+ * @param {string} message - User's message
+ * @param {Array} chatHistory - Array of previous chat messages
+ * @param {string} modelName - The specific Claude model to use
+ * @returns {Promise<Object>} - Object containing the AI response
+ */
+async function generateClaudeResponse(message, chatHistory, modelName) {
+    try {
+        if (!process.env.ANTHROPIC_API_KEY) {
+            throw new Error('Anthropic API key is not configured. Please add ANTHROPIC_API_KEY to your environment variables.');
+        }
+        
+        // Initialize Anthropic client
+        const anthropic = new Anthropic({
+            apiKey: process.env.ANTHROPIC_API_KEY
+        });
+        
+        // Format chat history for Claude
+        let messages = [];
+        for (const msg of chatHistory) {
+            messages.push({
+                role: msg.role === 'user' ? 'user' : 'assistant',
+                content: msg.content
+            });
+        }
+        
+        // Add the user's current message
+        messages.push({
+            role: 'user',
+            content: message
+        });
+        
+        // Call Claude API
+        const response = await anthropic.messages.create({
+            model: modelName,
+            messages: messages,
+            max_tokens: 2048,
+        });
+        
+        return {
+            response: response.content[0].text,
+            model: modelName
+        };
+    } catch (error) {
+        console.error(`Error generating Claude response with ${modelName}:`, error);
+        throw error;
+    }
+}
+
+// Auth middleware - require login for API endpoints
+function requireLogin(req, res, next) {
+    if (req.isAuthenticated()) {
+        return next();
+    }
+    res.status(401).json({ error: 'Authentication required' });
+}
+
+// API endpoint for analyzing research papers
+app.post('/api/analyze', requireLogin, async (req, res) => {
+    try {
+        // Check rate limiting
+        if (isRateLimited(req)) {
+            return res.status(429).json({ 
+                error: 'Rate limit exceeded', 
+                message: 'You have exceeded the free tier limit of 5 requests per minute' 
+            });
+        }
+
+        const { papers } = req.body;
+        
+        if (!papers || !Array.isArray(papers) || papers.length === 0) {
+            return res.status(400).json({ error: 'No papers provided for analysis' });
+        }
+        
+        // Generate a prompt for the Gemini model
+        const prompt = createAnalysisPrompt(papers);
+        
+        // Define models to try in order of preference
+        const modelOptions = [
+            "gemini-2.5-pro-preview-03-25",  // Enhanced thinking and reasoning
+            "gemini-1.5-pro",               // Complex reasoning tasks
+            "gemini-2.0-flash",             // Next generation features with thinking capabilities
+            "gemini-1.5-flash"              // Fast and versatile performance
+        ];
+        
+        let analysisResult;
+        let success = false;
+        let lastError = null;
+        
+        // Try each model until one succeeds
+        for (const modelName of modelOptions) {
+            if (success) break;
+            
+            try {
+                console.log(`Trying to use model: ${modelName}`);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                
+                // Generate content using the prompt
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
+                
+                // Parse the JSON response
+                try {
+                    // Extract JSON if it's wrapped in markdown code blocks
+                    const jsonMatch = text.match(/```json\n([\s\S]*)\n```/) || 
+                                    text.match(/```\n([\s\S]*)\n```/) || 
+                                    text.match(/{[\s\S]*}/);
+                    
+                    const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : text;
+                    analysisResult = JSON.parse(jsonStr);
+                    success = true;
+                    console.log(`Successfully used model: ${modelName}`);
+                    
+                    // Add model information to the response
+                    analysisResult.modelUsed = modelName;
+                } catch (parseError) {
+                    console.error(`Error parsing ${modelName} response:`, parseError);
+                    lastError = parseError;
+                }
+            } catch (modelError) {
+                console.error(`Error with model ${modelName}:`, modelError);
+                lastError = modelError;
+                // Continue to the next model
+            }
+        }
+        
+        // If all models failed, return a structured fallback response
+        if (!success) {
+            console.error('All models failed:', lastError);
+            analysisResult = {
+                summary: "The analysis identified several research gaps in the provided papers.",
+                gaps: [
+                    {
+                        title: "Service temporarily unavailable",
+                        description: "We couldn't process your request with any available model. This might be due to rate limits or service issues. Please try again later.",
+                        relatedPapers: papers.map(p => p.fileName)
+                    }
+                ],
+                recommendations: ["Try again later with different papers or smaller text samples."],
+                modelUsed: "fallback"
+            };
+        }
+        
+        // Save papers for chat
+        const userId = req.user.id;
+        if (!userChats.has(userId)) {
+            userChats.set(userId, { papers: papers, messages: [] });
+        } else {
+            userChats.get(userId).papers = papers;
+            // Keep existing messages
+        }
+        
+        return res.json(analysisResult);
+    } catch (error) {
+        console.error('Error analyzing papers:', error);
+        return res.status(500).json({ 
+            error: 'Error analyzing papers', 
+            message: error.message 
+        });
+    }
+});
+
+// API endpoint for chat about papers
+app.post('/api/chat', asyncHandler(async (req, res) => {
+    try {
+        // Validate input
+        const { message, chatHistory } = req.body;
+        
+        if (!message) {
+            return res.status(400).json({
+                error: true,
+                message: 'Missing message parameter',
+                details: 'Please provide a message to continue the conversation.'
+            });
+        }
+
+        // Check if we have papers available
+        const userId = req.user.id;
+        const userChatData = userChats.get(userId);
+        
+        if (!userChatData || !userChatData.papers || userChatData.papers.length === 0) {
+            return res.status(400).json({
+                error: true,
+                message: 'No research papers available',
+                details: 'Please upload at least one research paper before starting a conversation.'
+            });
+        }
+
+        // Get session info
+        const sessionId = req.session.id;
+        
+        // Try multiple models in order of preference
+        const models = ['gemini-1.5-pro', 'gpt-4o', 'claude-3-opus', 'gemini-pro'];
+        const modelErrors = [];
+        let response;
+        let modelUsed;
+
+        for (const model of models) {
+            try {
+                const result = await generateAIResponse(message, chatHistory, model, sessionId);
+                response = result.response;
+                modelUsed = model;
+                console.log(`Successfully used model: ${model}`);
+                break;
+            } catch (error) {
+                console.error(`Error with model ${model}:`, error.message);
+                modelErrors.push({
+                    model,
+                    error: error.message || 'Unknown error occurred'
+                });
+                
+                // If this is our last model, we'll need to return an error
+                if (model === models[models.length - 1]) {
+                    return res.status(500).json({
+                        error: true,
+                        message: 'Failed to generate response from any available AI model',
+                        details: modelErrors
+                    });
+                }
+            }
+        }
+
+        // Return the AI response
+        return res.json({
+            response,
+            modelUsed
+        });
+    } catch (error) {
+        console.error('Unexpected error in chat API:', error);
+        return res.status(500).json({
+            error: true,
+            message: 'An unexpected error occurred',
+            details: error.message || 'Unknown server error'
+        });
+    }
+}));
+
+// API endpoint to get user's chat history
+app.get('/api/chat-history', requireLogin, (req, res) => {
+    const userId = req.user.id;
+    
+    if (userChats.has(userId)) {
+        return res.json(userChats.get(userId));
+    }
+    
+    return res.json({ papers: [], messages: [] });
+});
+
+// File upload endpoint with multer
+app.post('/api/upload', requireLogin, upload.array('papers'), (req, res) => {
+    try {
+        const files = req.files.map(file => ({
+            filename: file.originalname,
+            path: file.path
+        }));
+        
+        res.json({ files });
+    } catch (error) {
+        console.error('Error uploading files:', error);
+        res.status(500).json({ error: 'Error uploading files' });
+    }
+});
+
+// Serve the main HTML file for routes other than API and login
+app.get('*', (req, res) => {
+    // Check if user is authenticated
+    if (!req.isAuthenticated() && !req.path.startsWith('/login') && !req.path.startsWith('/auth/')) {
+        return res.redirect('/login');
+    }
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// Start the server
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});

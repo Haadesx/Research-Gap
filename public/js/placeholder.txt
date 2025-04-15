@@ -1,0 +1,6 @@
+PDF.js library files need to be downloaded here:
+
+1. pdf.min.js - from https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js
+2. pdf.worker.min.js - from https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js
+
+These files are necessary for PDF processing functionality. 

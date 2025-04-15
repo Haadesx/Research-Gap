@@ -1,0 +1,473 @@
+/* Animation-specific styles - Refined for Professionalism & Visual Appeal */
+
+/* Body gradient - Subtle and slow */
+body {
+    /* Defined in styles.css, kept here for potential override/specificity */
+    background: linear-gradient(-45deg, #f8f9fa, #edf1f5, #e3e9ef, #d8e2ec);
+    background-size: 400% 400%; /* Larger size for slower perceived movement */
+    animation: gradient-bg 30s ease infinite; /* Slower duration */
+}
+
+@keyframes gradient-bg {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Header structure support */
+header {
+    position: relative;
+    transform-style: preserve-3d;
+}
+
+/* Transition overlay - Base style */
+.transition-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--primary-color);
+    opacity: 0;
+    transform-origin: center center; /* Change origin */
+    transform: scale(0);
+    z-index: 9999;
+    pointer-events: none;
+    border-radius: 50%; /* Animate as circle */
+}
+
+/* Title letter animation - Initial state */
+header .animate-title span {
+    display: inline-block;
+    opacity: 0;
+    transform-origin: bottom center;
+    /* transform is set by JS */
+}
+
+/* Initial state for animated elements (controlled by JS) */
+/* .animate-title, .animate-scale, etc. { opacity: 0; } */
+
+/* (Button styles/ripple removed - Handled by styles.css & JS) */
+
+/* Upload area styling - Base structural properties */
+#drop-area {
+    position: relative;
+    transform-style: preserve-3d;
+    /* Base border/bg in styles.css */
+    /* transition: transform 0.4s ease-out, box-shadow 0.4s ease-out; */ /* Base transitions in styles.css */
+}
+
+/* (Drop area hover removed - Handled by styles.css) */
+
+/* Loading animation - Only progress bar styles */
+/* Spinner style/animation is in styles.css */
+.progress-bar {
+    width: 70%; /* Slightly wider */
+    height: 8px; /* Thicker */
+    background-color: rgba(var(--primary-rgb, 74, 99, 231), 0.1); /* Use primary color with opacity */
+    border-radius: var(--border-radius-sm);
+    margin: var(--space-lg) auto var(--space-md) auto; /* Use variables */
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-inner {
+    height: 100%;
+    width: 0;
+    background-color: var(--primary-color); /* Use variable */
+    border-radius: var(--border-radius-sm);
+    /* box-shadow: 0 0 5px rgba(var(--primary-rgb, 74, 99, 231), 0.3); */ /* Optional: subtle glow */
+    transition: width 0.4s ease-out; /* Slightly smoother transition */
+}
+
+/* File particles - Base style */
+.file-particle {
+    position: absolute;
+    pointer-events: none;
+    width: 5px; /* Smaller */
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    opacity: 0.6; /* Slightly less opaque */
+    z-index: 5;
+}
+
+/* File list items - base structure */
+.file-list li {
+    position: relative;
+    /* Entrance animation handled by JS */
+}
+
+/* (Result card hover removed - handled by JS/styles.css) */
+.result-card {
+    perspective: 1200px;
+    transform-style: preserve-3d;
+    /* Base shadow/transitions in styles.css */
+}
+
+/* Chat message - Initial state */
+.chat-message {
+    opacity: 0;
+    /* Entrance animation handled by JS */
+}
+
+/* Typing indicator - Using styles from styles.css if defined there, else keep */
+/* Check if .typing-dots is fully styled in styles.css */
+.typing-dots span {
+    display: inline-block;
+    width: 7px; /* Slightly larger */
+    height: 7px;
+    border-radius: 50%;
+    margin: 0 3px;
+    background-color: var(--secondary-color);
+    animation: typing-bounce 1.3s infinite ease-in-out both;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: -0.26s; }
+.typing-dots span:nth-child(2) { animation-delay: -0.13s; }
+.typing-dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typing-bounce {
+    0%, 70%, 100% { transform: scale(0.6); opacity: 0.6; }
+    35% { transform: scale(1); opacity: 1; }
+}
+
+/* Optional: Subtle floating animation for specific elements */
+.float-animation {
+    animation: gentle-float 12s ease-in-out infinite;
+}
+
+@keyframes gentle-float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); } /* Slightly more movement */
+    100% { transform: translateY(0px); }
+}
+
+/* (Removed commented out / unused animations like shine, pulse, etc.) */
+
+/* Analysis timeline styles - Moved to styles.css */
+
+/* General container perspective - Moved to styles.css */
+
+/* Particles container positioning - Moved to styles.css */
+
+/* Lens Transition Overlay Styles - HYPER REALISTIC */
+.lens-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(5, 5, 10, 0.98); /* Even darker, almost opaque */
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    perspective: 1500px; /* Increase perspective for depth */
+}
+
+.lens-overlay.active {
+    pointer-events: auto;
+}
+
+.lens-assembly {
+    position: relative;
+    width: 400px; /* Larger base size */
+    height: 400px;
+    transform-style: preserve-3d;
+    /* Initial rotation for dynamic feel */
+    transform: rotateX(10deg) rotateY(-15deg) rotateZ(5deg);
+}
+
+.lens-rings {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 50%;
+    transform-style: preserve-3d;
+    /* Add subtle wobble/breathing */
+    animation: lens-wobble 15s ease-in-out infinite;
+}
+
+@keyframes lens-wobble {
+    0% { transform: rotateX(0deg) rotateY(0deg) translateZ(0px); }
+    25% { transform: rotateX(-2deg) rotateY(1deg) translateZ(-5px); }
+    50% { transform: rotateX(1deg) rotateY(-2deg) translateZ(3px); }
+    75% { transform: rotateX(-1deg) rotateY(2deg) translateZ(-2px); }
+    100% { transform: rotateX(0deg) rotateY(0deg) translateZ(0px); }
+}
+
+.lens-rings .ring {
+    position: absolute;
+    border-radius: 50%;
+    box-sizing: border-box;
+    background: linear-gradient(to top, #222, #555); /* Metallic gradient */
+    box-shadow:
+        inset 0 2px 3px rgba(255, 255, 255, 0.15), /* Inner highlight */
+        inset 0 -2px 3px rgba(0, 0, 0, 0.4),   /* Inner shadow */
+        0 3px 5px rgba(0, 0, 0, 0.4),        /* Outer shadow */
+        0 0 1px rgba(255, 255, 255, 0.1);   /* Subtle edge */
+    /* Add texture/markings */
+    background-image:
+        linear-gradient(to top, #222, #555),
+        repeating-linear-gradient(0deg, transparent, transparent 1.5px, rgba(0,0,0,0.2) 1.5px, rgba(0,0,0,0.2) 2px); /* Fine lines */
+    background-size: 100% 100%, 100% 2px;
+    background-repeat: no-repeat, repeat-y;
+    background-position: 0 0, 0 0;
+}
+
+/* Defining ring sizes and positions with transform for 3D effect */
+.lens-rings .ring-1 { /* Outer Barrel */
+    width: 100%; height: 100%;
+    border: none; /* Use background/shadow for depth */
+    transform: translateZ(-20px); /* Push back */
+    background: linear-gradient(to top, #1a1a1a, #333);
+    box-shadow: /* More pronounced shadows */
+        inset 0 3px 5px rgba(255, 255, 255, 0.1),
+        inset 0 -5px 10px rgba(0, 0, 0, 0.6),
+        0 5px 15px rgba(0, 0, 0, 0.5);
+}
+.lens-rings .ring-2 { /* Focus Ring */
+    width: 90%; height: 90%;
+    margin: 5%;
+    transform: translateZ(10px); /* Bring forward */
+    background: linear-gradient(to top, #383838, #606060);
+    /* Add knurling/grip pattern */
+    background-image:
+        linear-gradient(to top, #383838, #606060),
+        repeating-linear-gradient(45deg, rgba(0,0,0,0.15), rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px),
+        repeating-linear-gradient(-45deg, rgba(0,0,0,0.15), rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
+}
+.lens-rings .ring-3 { /* Aperture Ring */
+    width: 75%; height: 75%;
+    margin: 12.5%;
+    transform: translateZ(30px); /* Bring further forward */
+    background: linear-gradient(to top, #282828, #484848);
+}
+.lens-rings .ring-4 { /* Front Element Ring */
+    width: 65%; height: 65%;
+    margin: 17.5%;
+    transform: translateZ(45px); /* Furthest forward ring */
+    background: linear-gradient(to top, #444, #666);
+    box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.2),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+        0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+
+.aperture {
+    position: absolute;
+    width: 60%;
+    height: 60%;
+    top: 20%; left: 20%;
+    border-radius: 50%;
+    overflow: hidden;
+    transform: translateZ(50px) scale(1);
+    background: radial-gradient(circle at center, rgba(15, 20, 30, 0.8) 0%, rgba(5, 8, 12, 0.95) 70%, #010203 100%); /* Slightly bluer dark tones */
+    box-shadow: inset 0 0 25px rgba(0,0,0,0.8); /* Deeper inner shadow */
+    /* Add ::before for subtle outer ring/bevel */
+    isolation: isolate; /* Ensure pseudo-elements render correctly */
+}
+
+.aperture::before {
+    content: '';
+    position: absolute;
+    top: -2%; left: -2%; /* Slightly outside */
+    width: 104%; height: 104%;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(173, 216, 230, 0.3); /* Faint cyan glow */
+    border: 1px solid rgba(100, 120, 140, 0.4); /* Faint metallic border */
+    z-index: -1; /* Behind aperture content */
+}
+
+/* Inner Lens Element - Enhance for Loading Animation */
+.inner-lens {
+    position: absolute;
+    top: 5%; left: 5%; 
+    width: 90%; height: 90%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 60% 40%, rgba(200, 225, 255, 0.05), rgba(30, 50, 70, 0.4) 80%), 
+                 radial-gradient(circle at 30% 70%, rgba(80, 130, 230, 0.06), transparent 60%); /* Slightly adjusted base */
+    box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.6), 
+                0 0 5px rgba(255, 255, 255, 0.05); 
+    transform-style: preserve-3d;
+    z-index: 1; 
+    overflow: hidden; 
+}
+
+/* Remove old chromatic aberration pseudo-elements */
+/* .inner-lens::before, .inner-lens::after { ... } */
+
+/* New Pseudo-elements for Loading Animation within Inner Lens */
+.inner-lens::before,
+.inner-lens::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background-position: center center;
+    background-repeat: no-repeat;
+    opacity: 0; /* Hidden initially, shown during loading */
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Loading state styles for inner-lens pseudo-elements */
+.lens-overlay.active .inner-lens::before {
+    /* Rotating Grid Effect */
+    background-image: 
+        radial-gradient(rgba(100, 180, 255, 0.1) 1px, transparent 1px),
+        radial-gradient(rgba(100, 180, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px;
+    background-position: 0 0, 10px 10px;
+    animation: rotateGrid 25s linear infinite;
+    opacity: 0.5; /* Make visible during loading */
+}
+
+.lens-overlay.active .inner-lens::after {
+    /* Pulsing Energy Core Effect */
+    background-image: radial-gradient(circle at center, 
+        rgba(173, 216, 230, 0.5) 0%, 
+        rgba(173, 216, 230, 0.2) 30%, 
+        transparent 60%);
+    animation: pulseCore 3s ease-in-out infinite alternate;
+    opacity: 1; /* Make visible during loading */
+}
+
+@keyframes rotateGrid {
+    from { transform: rotate(0deg) scale(1.2); }
+    to { transform: rotate(360deg) scale(1.2); }
+}
+
+@keyframes pulseCore {
+    from { transform: scale(0.8); opacity: 0.7; }
+    to { transform: scale(1.1); opacity: 1; }
+}
+
+/* Aperture Blades - Subtle animation during loading */
+.lens-overlay.active .aperture-blade {
+    animation: bladeTwitch 7s ease-in-out infinite alternate;
+    animation-delay: calc(var(--blade-index, 1) * 0.2s); /* Stagger twitch */
+}
+
+/* Assign --blade-index for staggering */
+.aperture-blade-1 { --blade-index: 1; }
+.aperture-blade-2 { --blade-index: 2; }
+.aperture-blade-3 { --blade-index: 3; }
+.aperture-blade-4 { --blade-index: 4; }
+.aperture-blade-5 { --blade-index: 5; }
+.aperture-blade-6 { --blade-index: 6; }
+
+@keyframes bladeTwitch {
+    0%, 100% { transform: rotate(calc(var(--initial-rotate, 0deg))) translateY(0) skewX(0); }
+    50% { transform: rotate(calc(var(--initial-rotate, 0deg) + 0.5deg)) translateY(-1px) skewX(0.5deg); } 
+    /* Need to dynamically get --initial-rotate if using JS, 
+       otherwise keep rotation static during twitch */
+}
+
+/* Lens Rings - Subtle rotation/shift during loading */
+.lens-overlay.active .lens-rings .ring-2 { /* Focus Ring */
+    animation: ringShiftFocus 15s ease-in-out infinite alternate;
+}
+.lens-overlay.active .lens-rings .ring-3 { /* Aperture Ring */
+    animation: ringShiftAperture 18s ease-in-out infinite alternate;
+    animation-delay: -3s;
+}
+
+@keyframes ringShiftFocus {
+    from { transform: translateZ(10px) rotateZ(-0.5deg); }
+    to { transform: translateZ(12px) rotateZ(0.5deg); }
+}
+@keyframes ringShiftAperture {
+    from { transform: translateZ(30px) rotateZ(0.8deg); }
+    to { transform: translateZ(28px) rotateZ(-0.8deg); }
+}
+
+/* Lens Glare Effect - Enhance during loading */
+.lens-overlay.active .lens-glare {
+    /* Make glare animation more intense */
+    animation: glare-sweep-active 6s ease-in-out infinite alternate; 
+}
+
+@keyframes glare-sweep-active {
+    0% { opacity: 0.3; transform: translateZ(15px) rotate(-30deg) scale(1.2); background: radial-gradient(circle at 15% 20%, rgba(230, 240, 255, 0.5), transparent 35%); }
+    50% { opacity: 0.8; transform: translateZ(20px) rotate(15deg) scale(1); background: radial-gradient(circle at 45% 40%, rgba(230, 240, 255, 0.7), transparent 55%); }
+    100% { opacity: 0.4; transform: translateZ(15px) rotate(40deg) scale(1.2); background: radial-gradient(circle at 70% 60%, rgba(230, 240, 255, 0.4), transparent 65%); }
+}
+
+/* Stop ring/blade/glare animations when overlay is not active */
+.lens-rings .ring-2, 
+.lens-rings .ring-3,
+.aperture-blade,
+.lens-glare {
+    animation-play-state: paused; 
+}
+.lens-overlay.active .lens-rings .ring-2, 
+.lens-overlay.active .lens-rings .ring-3,
+.lens-overlay.active .aperture-blade,
+.lens-overlay.active .lens-glare {
+    animation-play-state: running;
+}
+
+/* Adjust lens-content position */
+.lens-content {
+    /* Existing flex styles... */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 20; /* Above glare */
+    text-align: center;
+    color: #cce7ff;
+    opacity: 0;
+    transform: translateZ(75px) scale(0.9); /* Position further forward */
+    text-shadow: 0 0 10px rgba(173, 216, 230, 0.7); /* Stronger glow */
+    pointer-events: none;
+}
+
+.lens-content .lens-spinner {
+    /* Keep existing styles or refine */
+    border: 3px solid rgba(173, 216, 230, 0.25);
+    border-radius: 50%;
+    border-top-color: #adefff; /* Light cyan */
+    border-left-color: #adefff;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto var(--space-lg); /* Increase bottom margin */
+}
+
+.lens-content .lens-status-text {
+    font-size: 1.15rem; /* Slightly larger */
+    font-weight: 400; /* Normal weight */
+    letter-spacing: 1px; /* Wider spacing */
+    margin-bottom: 0; /* Reset margin */
+    color: #e0f8ff; /* Lighter text color */
+}
+
+@keyframes scanline {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Remove old aperture pseudo-elements if they existed */
+.aperture::before,
+.aperture::after {
+    content: none;
+}
+
+/* (Removed old .transition-overlay styles if they existed) */
+
+/* (Removed commented out / unused animations like shine, pulse, etc.) */
+
+/* Analysis timeline styles - Moved to styles.css */
+
+/* General container perspective - Moved to styles.css */
+
+/* Particles container positioning - Moved to styles.css */ 
